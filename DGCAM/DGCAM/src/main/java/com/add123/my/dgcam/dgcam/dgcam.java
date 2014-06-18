@@ -37,6 +37,9 @@ import android.widget.LinearLayout;
 
 
 public class dgcam extends Activity {
+    private static final String TAG = "DGCAM";
+    public static final int MEDIA_TYPE_IMAGE = 1;
+    public static final int MEDIA_TYPE_VIDEO = 2;
     private Camera mCamera;
     private CameraPreview mPreview;
     private SensorManager sensorManager = null;
@@ -111,12 +114,88 @@ public class dgcam extends Activity {
 
     }
 
+    private PictureCallback mPicture = new PictureCallback() {
+
+        public void onPictureTaken(byte[] data, Camera camera) {
+
+            // Replacing the button after a photho was taken.
+            flBtnContainer.setVisibility(View.GONE);
+            ibRetake.setVisibility(View.VISIBLE);
+            ibUse.setVisibility(View.VISIBLE);
+
+            // File name of the image that we just took.
+            fileName = "IMG_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()).toString() + ".jpg";
+
+            // Creating the directory where to save the image. Sadly in older
+            // version of Android we can not get the Media catalog name
+            File mkDir = new File(sdRoot, dir);
+            mkDir.mkdirs();
+
+            // Main file where to save the data that we recive from the camera
+            File pictureFile = new File(sdRoot, dir + fileName);
+
+            try {
+                FileOutputStream purge = new FileOutputStream(pictureFile);
+                purge.write(data);
+                purge.close();
+            } catch (FileNotFoundException e) {
+                Log.d("DG_DEBUG", "File not found: " + e.getMessage());
+            } catch (IOException e) {
+                Log.d("DG_DEBUG", "Error accessing file: " + e.getMessage());
+            }
+
+            // Adding Exif data for the orientation. For some strange reason the
+            // ExifInterface class takes a string instead of a file.
+            try {
+                exif = new ExifInterface("/sdcard/" + dir + fileName);
+                exif.setAttribute(ExifInterface.TAG_ORIENTATION, "" + orientation);
+                exif.saveAttributes();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }
+    };
+
+    private static File getOutputMediaFile(int type){
+        // To be safe, you should check that the SDCard is mounted
+        // using Environment.getExternalStorageState() before doing this.
+
+        File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_PICTURES), "MyCameraApp");
+        // This location works best if you want the created images to be shared
+        // between applications and persist after your app has been uninstalled.
+
+        // Create the storage directory if it does not exist
+        if (! mediaStorageDir.exists()){
+            if (! mediaStorageDir.mkdirs()){
+                Log.d("MyCameraApp", "failed to create directory");
+                return null;
+            }
+        }
+
+        // Create a media file name
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        File mediaFile;
+        if (type == MEDIA_TYPE_IMAGE){
+            mediaFile = new File(mediaStorageDir.getPath() + File.separator +
+                    "IMG_"+ timeStamp + ".jpg");
+        } else if(type == MEDIA_TYPE_VIDEO) {
+            mediaFile = new File(mediaStorageDir.getPath() + File.separator +
+                    "VID_"+ timeStamp + ".mp4");
+        } else {
+            return null;
+        }
+
+        return mediaFile;
+    }
+
     private void createCamera() {
         // Create an instance of Camera
         mCamera = getCameraInstance();
 
 //        Setting the right parameters in the camera
-       Camera.Parameters params = mCamera.getParameters();
+        Camera.Parameters params = mCamera.getParameters();
         params.setPictureSize(1600, 1200);
         params.setPictureFormat(PixelFormat.JPEG);
         params.setJpegQuality(85);
@@ -221,49 +300,6 @@ public class dgcam extends Activity {
         // returns null if camera is unavailable
         return c;
     }
-
-    private PictureCallback mPicture = new PictureCallback() {
-
-        public void onPictureTaken(byte[] data, Camera camera) {
-
-            // Replacing the button after a photho was taken.
-            flBtnContainer.setVisibility(View.GONE);
-            ibRetake.setVisibility(View.VISIBLE);
-            ibUse.setVisibility(View.VISIBLE);
-
-            // File name of the image that we just took.
-            fileName = "IMG_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()).toString() + ".jpg";
-
-            // Creating the directory where to save the image. Sadly in older
-            // version of Android we can not get the Media catalog name
-            File mkDir = new File(sdRoot, dir);
-            mkDir.mkdirs();
-
-            // Main file where to save the data that we recive from the camera
-            File pictureFile = new File(sdRoot, dir + fileName);
-
-            try {
-                FileOutputStream purge = new FileOutputStream(pictureFile);
-                purge.write(data);
-                purge.close();
-            } catch (FileNotFoundException e) {
-                Log.d("DG_DEBUG", "File not found: " + e.getMessage());
-            } catch (IOException e) {
-                Log.d("DG_DEBUG", "Error accessing file: " + e.getMessage());
-            }
-
-            // Adding Exif data for the orientation. For some strange reason the
-            // ExifInterface class takes a string instead of a file.
-            try {
-                exif = new ExifInterface("/sdcard/" + dir + fileName);
-                exif.setAttribute(ExifInterface.TAG_ORIENTATION, "" + orientation);
-                exif.saveAttributes();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-        }
-    };
 
     /**
      * Putting in place a listener so we can get the sensor data only when
